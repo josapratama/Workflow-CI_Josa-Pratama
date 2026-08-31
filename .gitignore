@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+mlruns/
+*.egg-info/
+heart_disease_raw.csv

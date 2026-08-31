@@ -1,0 +1,89 @@
+name: Heart Disease CI - MLflow Training
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run actions/checkout@v3
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.12.7
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12.7"
+
+      - name: Check Env
+        run: |
+          python --version
+          pip --version
+          echo "Working directory: $(pwd)"
+          echo "Files in MLProject:"
+          ls -la MLProject/
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install mlflow==2.19.0 scikit-learn==1.5.2 pandas==2.2.2 \
+                      numpy==1.26.4 matplotlib==3.9.2 seaborn==0.13.2
+
+      - name: Run mlflow project
+        run: |
+          mlflow run MLProject \
+            --env-manager=local \
+            -P n_estimators=100 \
+            -P max_depth=10 \
+            -P min_samples_split=5 \
+            -P min_samples_leaf=2
+
+      - name: Get latest MLflow run_id
+        run: |
+          RUN_ID=$(cat latest_run_id.txt 2>/dev/null || echo "unknown")
+          echo "Latest MLflow Run ID: $RUN_ID"
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+
+      - name: Install Python dependencies for upload
+        run: |
+          pip install mlflow==2.19.0
+
+      - name: Upload to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-artifacts-${{ github.run_number }}
+          path: |
+            MLProject/heart_disease_preprocessing/
+            mlruns/
+            latest_run_id.txt
+          retention-days: 30
+
+      - name: Commit artifacts to repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Buat folder artifacts jika belum ada
+          mkdir -p artifacts/run-${{ github.run_number }}
+          
+          # Copy preprocessed data
+          if [ -d "MLProject/heart_disease_preprocessing" ]; then
+            cp -r MLProject/heart_disease_preprocessing artifacts/run-${{ github.run_number }}/
+          fi
+          
+          # Simpan run info
+          echo "Run Number: ${{ github.run_number }}" > artifacts/run-${{ github.run_number }}/run_info.txt
+          echo "Run ID: ${{ env.RUN_ID }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
+          echo "Commit SHA: ${{ github.sha }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
+          echo "Triggered by: ${{ github.event_name }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
+          echo "Timestamp: $(date -u)" >> artifacts/run-${{ github.run_number }}/run_info.txt
+          
+          git add artifacts/
+          git diff --staged --quiet || git commit -m "ci: save artifacts from run #${{ github.run_number }} [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
