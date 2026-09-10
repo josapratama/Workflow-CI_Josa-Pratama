@@ -30,17 +30,11 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install mlflow==2.19.0 scikit-learn==1.5.2 pandas==2.2.2 \
-                      numpy==1.26.4 matplotlib==3.9.2 seaborn==0.13.2
+          pip install mlflow==2.19.0 scikit-learn==1.5.2 pandas==2.2.2 numpy==1.26.4 matplotlib==3.9.2 seaborn==0.13.2
 
       - name: Run mlflow project
         run: |
-          mlflow run MLProject \
-            --env-manager=local \
-            -P n_estimators=100 \
-            -P max_depth=10 \
-            -P min_samples_split=5 \
-            -P min_samples_leaf=2
+          mlflow run MLProject --env-manager=local -P n_estimators=100 -P max_depth=10 -P min_samples_split=5 -P min_samples_leaf=2
 
       - name: Get latest MLflow run_id
         run: |
@@ -66,22 +60,15 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Buat folder artifacts jika belum ada
           mkdir -p artifacts/run-${{ github.run_number }}
-          
-          # Copy preprocessed data
           if [ -d "MLProject/heart_disease_preprocessing" ]; then
             cp -r MLProject/heart_disease_preprocessing artifacts/run-${{ github.run_number }}/
           fi
-          
-          # Simpan run info
           echo "Run Number: ${{ github.run_number }}" > artifacts/run-${{ github.run_number }}/run_info.txt
           echo "Run ID: ${{ env.RUN_ID }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
           echo "Commit SHA: ${{ github.sha }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
           echo "Triggered by: ${{ github.event_name }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
           echo "Timestamp: $(date -u)" >> artifacts/run-${{ github.run_number }}/run_info.txt
-          
           git add artifacts/
           git diff --staged --quiet || git commit -m "ci: save artifacts from run #${{ github.run_number }} [skip ci]"
           git push
