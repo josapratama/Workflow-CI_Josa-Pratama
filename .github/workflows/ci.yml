@@ -74,6 +74,7 @@ jobs:
           echo "Timestamp: $(date -u)" >> artifacts/run-${{ github.run_number }}/run_info.txt
           git add artifacts/
           git diff --staged --quiet || git commit -m "ci: save artifacts from run #${{ github.run_number }} [skip ci]"
+          git pull --rebase origin main
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
