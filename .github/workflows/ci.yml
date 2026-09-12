@@ -59,6 +59,49 @@ jobs:
             latest_run_id.txt
           retention-days: 30
 
+      - name: Build Docker Model
+        run: |
+          # Cari path model dari mlruns
+          MODEL_PATH=$(find mlruns -name "MLmodel" | head -1 | xargs dirname)
+          echo "Model path: $MODEL_PATH"
+
+          if [ -z "$MODEL_PATH" ]; then
+            echo "Model tidak ditemukan di mlruns, skip Docker build"
+          else
+            # Copy model ke folder MLProject/model untuk Docker build
+            mkdir -p MLProject/model
+            cp -r $MODEL_PATH/. MLProject/model/
+
+            # Build Docker image menggunakan mlflow
+            mlflow models build-docker \
+              -m "$MODEL_PATH" \
+              -n josapratama/heart-disease-classifier \
+              --enable-mlserver || \
+            docker build -t josapratama/heart-disease-classifier:latest MLProject/ -f MLProject/Dockerfile
+            
+            echo "Docker image berhasil dibuat: josapratama/heart-disease-classifier:latest"
+            docker images josapratama/heart-disease-classifier
+          fi
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Tag Docker Image
+        run: |
+          docker tag josapratama/heart-disease-classifier:latest \
+            josapratama/heart-disease-classifier:${{ github.run_number }}
+          echo "Image tagged: josapratama/heart-disease-classifier:${{ github.run_number }}"
+
+      - name: Push Docker Image
+        run: |
+          docker push josapratama/heart-disease-classifier:latest
+          docker push josapratama/heart-disease-classifier:${{ github.run_number }}
+          echo "Image pushed ke Docker Hub"
+          echo "DOCKER_IMAGE=josapratama/heart-disease-classifier:latest" >> $GITHUB_ENV
+
       - name: Commit artifacts to repository
         run: |
           git config --global user.name "github-actions[bot]"
@@ -67,11 +110,12 @@ jobs:
           if [ -d "MLProject/heart_disease_preprocessing" ]; then
             cp -r MLProject/heart_disease_preprocessing artifacts/run-${{ github.run_number }}/
           fi
-          echo "Run Number: ${{ github.run_number }}" > artifacts/run-${{ github.run_number }}/run_info.txt
-          echo "Run ID: ${{ env.RUN_ID }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
-          echo "Commit SHA: ${{ github.sha }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
-          echo "Triggered by: ${{ github.event_name }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
-          echo "Timestamp: $(date -u)" >> artifacts/run-${{ github.run_number }}/run_info.txt
+          echo "Run Number : ${{ github.run_number }}"  > artifacts/run-${{ github.run_number }}/run_info.txt
+          echo "Run ID     : ${{ env.RUN_ID }}"        >> artifacts/run-${{ github.run_number }}/run_info.txt
+          echo "Commit SHA : ${{ github.sha }}"        >> artifacts/run-${{ github.run_number }}/run_info.txt
+          echo "Triggered  : ${{ github.event_name }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
+          echo "Docker Img : josapratama/heart-disease-classifier:${{ github.run_number }}" >> artifacts/run-${{ github.run_number }}/run_info.txt
+          echo "Timestamp  : $(date -u)"               >> artifacts/run-${{ github.run_number }}/run_info.txt
           git add artifacts/
           git diff --staged --quiet || git commit -m "ci: save artifacts from run #${{ github.run_number }} [skip ci]"
           git pull --rebase origin main

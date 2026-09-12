@@ -1,0 +1,10 @@
+Docker Hub Repository
+=====================
+Image: josapratama/heart-disease-classifier
+URL  : https://hub.docker.com/r/josapratama/heart-disease-classifier
+
+Cara pull dan jalankan:
+    docker pull josapratama/heart-disease-classifier:latest
+    docker run -p 5002:8080 josapratama/heart-disease-classifier:latest
+
+Serving endpoint: http://localhost:5002/invocations
